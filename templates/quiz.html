@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}問題演習 - AP試験 学習トラッカー{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <div class="card p-4">
+      <h5 class="fw-bold mb-4"><i class="bi bi-pencil-square me-2"></i>問題演習の結果を記録</h5>
+      <form method="post" id="quizForm">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">大カテゴリ</label>
+          <select class="form-select" name="category" id="category" required>
+            <option value="">選択してください</option>
+            {% for cat in categories %}
+            <option value="{{ cat }}">{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">分野（サブカテゴリ）</label>
+          <select class="form-select" name="subcategory" id="subcategory" required disabled>
+            <option value="">大カテゴリを先に選択してください</option>
+          </select>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <label class="form-label fw-semibold">解いた問題数</label>
+            <input type="number" class="form-control" name="total" id="total" min="1" max="500" placeholder="例: 10" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-semibold">正解数</label>
+            <input type="number" class="form-control" name="correct" id="correct" min="0" max="500" placeholder="例: 7" required>
+          </div>
+        </div>
+
+        <!-- リアルタイム正答率表示 -->
+        <div class="mb-3 p-3 rounded" style="background:#f1f5f9" id="ratePreview">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="small text-muted">今回の正答率</span>
+            <span class="fw-bold fs-5" id="rateDisplay">--</span>
+          </div>
+          <div class="progress rate-bar mt-2">
+            <div class="progress-bar" id="rateBar" style="width:0%"></div>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">メモ（任意）</label>
+          <textarea class="form-control" name="notes" rows="3"
+            placeholder="例: 午前問題 令和5年春。ネットワーク分野が不安定。"></textarea>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-plus-circle me-1"></i>記録する
+          </button>
+          <a href="/" class="btn btn-outline-secondary">キャンセル</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const categoriesData = {{ categories | tojson }};
+const catSelect = document.getElementById('category');
+const subSelect = document.getElementById('subcategory');
+const totalInput = document.getElementById('total');
+const correctInput = document.getElementById('correct');
+const rateDisplay = document.getElementById('rateDisplay');
+const rateBar = document.getElementById('rateBar');
+
+catSelect.addEventListener('change', function() {
+  const cat = this.value;
+  subSelect.innerHTML = '';
+  if (!cat) {
+    subSelect.disabled = true;
+    subSelect.innerHTML = '<option value="">大カテゴリを先に選択してください</option>';
+    return;
+  }
+  subSelect.disabled = false;
+  const subs = categoriesData[cat] || [];
+  subSelect.innerHTML = '<option value="">選択してください</option>';
+  subs.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    subSelect.appendChild(opt);
+  });
+});
+
+function updateRate() {
+  const total = parseInt(totalInput.value) || 0;
+  const correct = parseInt(correctInput.value) || 0;
+  if (total > 0 && correct >= 0) {
+    const rate = Math.min(correct, total) / total * 100;
+    rateDisplay.textContent = rate.toFixed(1) + '%';
+    rateBar.style.width = rate + '%';
+    if (rate >= 80) {
+      rateBar.className = 'progress-bar bg-success';
+      rateDisplay.className = 'fw-bold fs-5 text-success';
+    } else if (rate >= 60) {
+      rateBar.className = 'progress-bar bg-warning';
+      rateDisplay.className = 'fw-bold fs-5 text-warning';
+    } else {
+      rateBar.className = 'progress-bar bg-danger';
+      rateDisplay.className = 'fw-bold fs-5 text-danger';
+    }
+  } else {
+    rateDisplay.textContent = '--';
+    rateDisplay.className = 'fw-bold fs-5';
+    rateBar.style.width = '0%';
+  }
+}
+
+totalInput.addEventListener('input', updateRate);
+correctInput.addEventListener('input', updateRate);
+</script>
+{% endblock %}

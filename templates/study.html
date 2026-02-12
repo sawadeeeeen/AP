@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}学習記録 - AP試験 学習トラッカー{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <div class="card p-4">
+      <h5 class="fw-bold mb-4"><i class="bi bi-book me-2"></i>学習記録を追加</h5>
+      <form method="post">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">大カテゴリ</label>
+          <select class="form-select" name="category" id="category" required>
+            <option value="">選択してください</option>
+            {% for cat in categories %}
+            <option value="{{ cat }}">{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">分野（サブカテゴリ）</label>
+          <select class="form-select" name="subcategory" id="subcategory" required disabled>
+            <option value="">大カテゴリを先に選択してください</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">学習時間（分）</label>
+          <input type="number" class="form-control" name="duration" min="1" max="600" placeholder="例: 30" required>
+        </div>
+        <div class="mb-4">
+          <label class="form-label fw-semibold">メモ（任意）</label>
+          <textarea class="form-control" name="notes" rows="3"
+            placeholder="例: OSI参照モデルの各層を復習。トランスポート層が少し曖昧だった。"></textarea>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-plus-circle me-1"></i>記録する
+          </button>
+          <a href="/" class="btn btn-outline-secondary">キャンセル</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const categoriesData = {{ categories | tojson }};
+const catSelect = document.getElementById('category');
+const subSelect = document.getElementById('subcategory');
+
+catSelect.addEventListener('change', function() {
+  const cat = this.value;
+  subSelect.innerHTML = '';
+  if (!cat) {
+    subSelect.disabled = true;
+    subSelect.innerHTML = '<option value="">大カテゴリを先に選択してください</option>';
+    return;
+  }
+  subSelect.disabled = false;
+  const subs = categoriesData[cat] || [];
+  subSelect.innerHTML = '<option value="">選択してください</option>';
+  subs.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    subSelect.appendChild(opt);
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}ダッシュボード - AP試験 学習トラッカー{% endblock %}
+
+{% block content %}
+<h4 class="mb-4 fw-bold">ダッシュボード</h4>
+
+<!-- サマリーカード -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card stat-card blue p-3">
+      <div class="text-muted small">総学習時間</div>
+      <div class="fs-4 fw-bold text-primary">
+        {% if total_study_minutes >= 60 %}
+          {{ (total_study_minutes // 60) }}h {{ total_study_minutes % 60 }}m
+        {% else %}
+          {{ total_study_minutes }}分
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card green p-3">
+      <div class="text-muted small">解いた問題数</div>
+      <div class="fs-4 fw-bold text-success">{{ total_questions }}問</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card orange p-3">
+      <div class="text-muted small">総合正答率</div>
+      <div class="fs-4 fw-bold text-warning">
+        {% if overall_rate is not none %}{{ overall_rate }}%{% else %}--{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card purple p-3">
+      <div class="text-muted small">未学習分野</div>
+      <div class="fs-4 fw-bold text-purple" style="color:#a855f7">{{ unstudied|length }}分野</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- 苦手分野 -->
+  <div class="col-md-6">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3 text-danger"><i class="bi bi-exclamation-triangle me-2"></i>苦手分野（正答率が低い順）</h6>
+      {% if weak %}
+        <ul class="list-unstyled mb-0">
+          {% for sub, s in weak %}
+          <li class="mb-3">
+            <div class="d-flex justify-content-between mb-1">
+              <span class="small fw-semibold">{{ sub }}</span>
+              <span class="badge weak-badge">{{ s.rate }}%</span>
+            </div>
+            <div class="progress rate-bar">
+              <div class="progress-bar bg-danger" style="width:{{ s.rate }}%"></div>
+            </div>
+            <div class="text-muted" style="font-size:0.75em">{{ s.correct }}/{{ s.total }}問 正解</div>
+          </li>
+          {% endfor %}
+        </ul>
+        <a href="/stats" class="btn btn-sm btn-outline-danger mt-2">詳細を見る</a>
+      {% else %}
+        <p class="text-muted small">問題演習を記録すると苦手分野が表示されます</p>
+        <a href="/quiz" class="btn btn-sm btn-outline-danger">問題演習を記録する</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- 得意分野 -->
+  <div class="col-md-6">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3 text-success"><i class="bi bi-star me-2"></i>得意分野（正答率が高い順）</h6>
+      {% if strong %}
+        <ul class="list-unstyled mb-0">
+          {% for sub, s in strong %}
+          <li class="mb-3">
+            <div class="d-flex justify-content-between mb-1">
+              <span class="small fw-semibold">{{ sub }}</span>
+              <span class="badge strong-badge">{{ s.rate }}%</span>
+            </div>
+            <div class="progress rate-bar">
+              <div class="progress-bar bg-success" style="width:{{ s.rate }}%"></div>
+            </div>
+            <div class="text-muted" style="font-size:0.75em">{{ s.correct }}/{{ s.total }}問 正解</div>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-muted small">問題演習を記録すると得意分野が表示されます</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- おすすめ学習 -->
+  <div class="col-12">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3 text-primary"><i class="bi bi-lightbulb me-2"></i>パーソナライズ学習アドバイス</h6>
+      <div class="row g-3">
+        {% if weak %}
+        <div class="col-md-4">
+          <div class="border rounded p-3 h-100" style="border-color:#fca5a5!important;background:#fff5f5">
+            <div class="small fw-bold text-danger mb-2">優先して取り組もう</div>
+            {% for sub, s in weak[:3] %}
+            <div class="mb-1">
+              <a href="/quiz" class="text-decoration-none small">
+                <i class="bi bi-arrow-right-circle text-danger me-1"></i>{{ sub }}（{{ s.rate }}%）
+              </a>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+        {% if unstudied %}
+        <div class="col-md-4">
+          <div class="border rounded p-3 h-100" style="border-color:#93c5fd!important;background:#eff6ff">
+            <div class="small fw-bold text-primary mb-2">まだ手をつけていない分野</div>
+            {% for sub in unstudied[:3] %}
+            <div class="mb-1">
+              <a href="/study" class="text-decoration-none small">
+                <i class="bi bi-plus-circle text-primary me-1"></i>{{ sub }}
+              </a>
+            </div>
+            {% endfor %}
+            {% if unstudied|length > 3 %}
+            <div class="text-muted small mt-1">他 {{ unstudied|length - 3 }} 分野</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+        {% if strong %}
+        <div class="col-md-4">
+          <div class="border rounded p-3 h-100" style="border-color:#86efac!important;background:#f0fdf4">
+            <div class="small fw-bold text-success mb-2">このまま維持しよう</div>
+            {% for sub, s in strong[:3] %}
+            <div class="mb-1 small">
+              <i class="bi bi-check-circle text-success me-1"></i>{{ sub }}（{{ s.rate }}%）
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- 最近の学習記録 -->
+  <div class="col-md-6">
+    <div class="card p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="fw-bold mb-0"><i class="bi bi-clock-history me-2"></i>最近の学習記録</h6>
+        <a href="/study" class="btn btn-sm btn-primary">+ 追加</a>
+      </div>
+      {% if recent_sessions %}
+      <ul class="list-unstyled mb-0">
+        {% for s in recent_sessions %}
+        <li class="border-bottom py-2">
+          <div class="d-flex justify-content-between">
+            <span class="small fw-semibold">{{ s.subcategory }}</span>
+            <span class="text-muted small">{{ s.duration_minutes }}分</span>
+          </div>
+          <div class="text-muted" style="font-size:0.75em">{{ s.created_at[:10] }}
+            {% if s.notes %} · {{ s.notes[:30] }}{% if s.notes|length > 30 %}…{% endif %}{% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-muted small mb-0">まだ記録がありません</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- 最近の問題演習 -->
+  <div class="col-md-6">
+    <div class="card p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="fw-bold mb-0"><i class="bi bi-pencil-square me-2"></i>最近の問題演習</h6>
+        <a href="/quiz" class="btn btn-sm btn-primary">+ 追加</a>
+      </div>
+      {% if recent_quizzes %}
+      <ul class="list-unstyled mb-0">
+        {% for q in recent_quizzes %}
+        <li class="border-bottom py-2">
+          <div class="d-flex justify-content-between">
+            <span class="small fw-semibold">{{ q.subcategory }}</span>
+            <span class="badge {{ 'strong-badge' if (q.correct_answers / q.total_questions * 100) >= 70 else 'weak-badge' }}">
+              {{ q.correct_answers }}/{{ q.total_questions }}問
+              ({{ (q.correct_answers / q.total_questions * 100)|round(0)|int }}%)
+            </span>
+          </div>
+          <div class="text-muted" style="font-size:0.75em">{{ q.created_at[:10] }}
+            {% if q.notes %} · {{ q.notes[:30] }}{% if q.notes|length > 30 %}…{% endif %}{% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-muted small mb-0">まだ記録がありません</p>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
