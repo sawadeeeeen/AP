@@ -2,9 +2,21 @@
 """
 Claude が叩くデータ操作スクリプト。
 標準出力にテキストで結果を返す。
+
+コマンド一覧:
+  add-study  <分野> <分数> [メモ]   学習記録を追加
+  add-quiz   <分野> <問題数> <正解数> [メモ]   演習結果を記録
+  next       [分野]   次のSRS問題を表示
+  answer     <id> <1|0>   問題に正誤を記録
+  due        今日の復習件数を表示
+  dashboard  ダッシュボード表示
+  stats      全分野の統計表示
+  weak       苦手分野と未学習分野を表示
+  init-questions   問題データをDBに投入
 """
 import sys
 import database as db
+
 
 def fmt_bar(rate, width=16):
     if rate is None:
@@ -14,15 +26,15 @@ def fmt_bar(rate, width=16):
     mark = "◎" if rate >= 80 else ("△" if rate >= 60 else "✕")
     return f"{bar}  {mark} {rate:.1f}%"
 
+
 def cmd_add_study(args):
     if len(args) < 2:
-        print("使い方: python db.py add-study <サブカテゴリ> <分数> [メモ]")
+        print("使い方: python db.py add-study <分野> <分数> [メモ]")
         sys.exit(1)
     sub = args[0]
     minutes = int(args[1])
     notes = " ".join(args[2:]) if len(args) > 2 else ""
 
-    # 親カテゴリを自動解決
     cat = db.get_subcategory_parent(sub)
     db.add_study_session(cat, sub, minutes, notes)
 
@@ -34,9 +46,10 @@ def cmd_add_study(args):
     print(f"  今回   : {minutes}分")
     print(f"  累計   : {h}h {m:02d}m")
 
+
 def cmd_add_quiz(args):
     if len(args) < 3:
-        print("使い方: python db.py add-quiz <サブカテゴリ> <問題数> <正解数> [メモ]")
+        print("使い方: python db.py add-quiz <分野> <問題数> <正解数> [メモ]")
         sys.exit(1)
     sub = args[0]
     total = int(args[1])
@@ -58,6 +71,60 @@ def cmd_add_quiz(args):
     print(f"  今回   : {correct}/{total}問  ({rate_now:.1f}%)")
     if overall_rate is not None:
         print(f"  累計正答率: {fmt_bar(overall_rate)}")
+
+
+def cmd_next(args):
+    """次のSRS問題を1問表示する"""
+    subcategory = args[0] if args else None
+    q = db.get_next_question(subcategory)
+    if q is None:
+        print("今日の復習は完了です！ お疲れさまでした。")
+        return
+    print(f"【問題 id={q['id']}】{q['subcategory']}")
+    print()
+    print(q["question"])
+    print()
+    print(f"  A. {q['option_a']}")
+    print(f"  B. {q['option_b']}")
+    print(f"  C. {q['option_c']}")
+    print(f"  D. {q['option_d']}")
+
+
+def cmd_answer(args):
+    """回答を記録してSRSを更新し解説を表示する"""
+    if len(args) < 2:
+        print("使い方: python db.py answer <id> <1|0>")
+        sys.exit(1)
+    question_id = int(args[0])
+    correct = bool(int(args[1]))
+    result = db.record_answer(question_id, correct)
+    verdict = "◎ 正解！" if correct else "✕ 不正解"
+    print(verdict)
+    print(f"  正解   : {result['correct_answer']}")
+    print(f"  解説   : {result['explanation']}")
+    print(f"  次回   : {result['next_review']}（{result['interval_days']}日後）")
+
+    # 演習記録にも反映
+    conn = db.get_db()
+    row = conn.execute(
+        "SELECT category, subcategory FROM questions WHERE id=?", (question_id,)
+    ).fetchone()
+    conn.close()
+    if row:
+        db.add_quiz_result(row["category"], row["subcategory"], 1, 1 if correct else 0)
+
+
+def cmd_due(args):
+    """今日の復習件数を表示する"""
+    counts = db.get_due_counts()
+    total_due = sum(counts["due"].values())
+    total_new = sum(counts["new"].values())
+    print(f"今日の復習: {total_due}件 / 新問題: {total_new}件")
+    if counts["due"]:
+        print("\n復習が必要な分野:")
+        for sub, cnt in sorted(counts["due"].items()):
+            print(f"  {sub}: {cnt}件")
+
 
 def cmd_dashboard(_args):
     db.init_db()
@@ -99,6 +166,7 @@ def cmd_dashboard(_args):
         if len(unstudied) > 4:
             print(f"  …他 {len(unstudied)-4} 分野")
 
+
 def cmd_stats(_args):
     db.init_db()
     study_time, quiz_stats = db.get_study_stats()
@@ -116,6 +184,7 @@ def cmd_stats(_args):
                 rate_str = "未演習"
             flag = " [未学習]" if not mins and not qs else ""
             print(f"  {sub:<16} {mins:>4}分  {rate_str}{flag}")
+
 
 def cmd_weak(_args):
     db.init_db()
@@ -136,17 +205,30 @@ def cmd_weak(_args):
         if len(unstudied) > 5:
             print(f"  …他 {len(unstudied)-5} 分野")
 
+
+def cmd_init_questions(_args):
+    """問題データをDBに投入する（初回 or 追加時に実行）"""
+    from questions import QUESTIONS
+    db.init_db()
+    n = db.upsert_questions(QUESTIONS)
+    print(f"✓ {n}問を投入しました（合計: {len(QUESTIONS)}問）")
+
+
 COMMANDS = {
-    "add-study": cmd_add_study,
-    "add-quiz":  cmd_add_quiz,
-    "dashboard": cmd_dashboard,
-    "stats":     cmd_stats,
-    "weak":      cmd_weak,
+    "add-study":       cmd_add_study,
+    "add-quiz":        cmd_add_quiz,
+    "next":            cmd_next,
+    "answer":          cmd_answer,
+    "due":             cmd_due,
+    "dashboard":       cmd_dashboard,
+    "stats":           cmd_stats,
+    "weak":            cmd_weak,
+    "init-questions":  cmd_init_questions,
 }
 
 if __name__ == "__main__":
     db.init_db()
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
-        print("コマンド: add-study / add-quiz / dashboard / stats / weak")
+        print("コマンド:", " / ".join(COMMANDS.keys()))
         sys.exit(1)
     COMMANDS[sys.argv[1]](sys.argv[2:])
