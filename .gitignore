@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+*.pyo
+study_tracker.db
+*.db
